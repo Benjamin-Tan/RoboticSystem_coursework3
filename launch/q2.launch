@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<launch>
+	<!-- Arguments available to run this -->
+  <arg name="gui" default="true"/>
+  <arg name="scene" default="1"/>
+  <arg name="world" default="$(find cw3_description)/worlds/cw3_grasp_$(arg scene).world"/>
+  <arg name="initial_z" default="0.73335" />
+    
+  <arg name="translation_noise" default="0.005"/>
+  <arg name="rotation_noise" default="0.05"/>
+  
+  <include file="$(find cw3_launch)/launch/hand_iiwa.launch">
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="world" value="$(arg world)"/>
+    <arg name="initial_z" value="$(arg initial_z)"/>
+  </include>
+  
+  <include file="$(find cw3_helper)/launch/object_tracker.launch">
+    <arg name="translation_noise" value="$(arg translation_noise)"/>
+    <arg name="rotation_noise" value="$(arg rotation_noise)"/>
+  </include>
+  
+  <rosparam command="load" file="$(find cw3_launch)/config/grasp_objects.yaml"/>
+  
+  <node pkg="cw3_helper" type="PlanningSceneController.py" name="scene_controller"/>
+
+</launch>
