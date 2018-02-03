@@ -41,7 +41,7 @@ class q3_dynamic():
         checkPos = self.iiwa_group.get_current_joint_values()
         print checkPos
 
-        self.iiwa_group.set_joint_value_target([0.3,0.6,0.1,0.3,0.2,1.5,0])
+        self.iiwa_group.set_joint_value_target([0.1,0.2,0.3,0.3,0.2,0.2,0])
         self.iiwa_group.go()
         rospy.sleep(3)
         #print self.current_joint_state
@@ -83,6 +83,14 @@ class q3_dynamic():
         self.object_z = Symbol('object_z')
         self.object_mass = Symbol('object_mass')
 
+        self.com = np.array([[0,-0.03,0.12], [0.0003,0.059,0.042], [0,0.03,0.13], [0,0.067,0.034],
+                             [0.0001,0.021,0.076], [0,0.0006,0.0004], [0,0,0.02]])
+        self.object_com = np.array([0,0,self.object_z])
+
+        # dh parameters => theta, d, alpha, a
+        
+        self.dh_param = np.array([[]])
+
 
     def find_mass_com_object(self):
         link_name = []
@@ -109,9 +117,10 @@ class q3_dynamic():
         tau_6 = self.g_z* ( self.m[5]*J6c[2,5] + self.m[6]*J7c[2,5] + self.object_mass*J8c[2,5] ) - self.current_joint_state.effort[5]
 
         sol = solve([tau_4,tau_6], [self.object_mass,self.object_z])
-        print sol[0][0]
-        print sol[0][1]
 
+        self.object_mass = sol[0][0]
+        self.object_z = sol[0][1]
+        print self.object_mass,self.object_z
 
 
     def get_jacobian_center(self,to_link_no,link_name):
@@ -138,95 +147,94 @@ class q3_dynamic():
         T_08 = self.pose_to_matrix(tf_08)
 
         # computer vector z and o
-        z0 = np.array([[0,0,1]]) #maybe todo
-        z1 = T_01[:3,2]
-        z2 = T_02[:3,2]
-        z3 = T_03[:3,2]
-        z4 = T_04[:3,2]
-        z5 = T_05[:3,2]
-        z6 = T_06[:3,2]
-        z7 = T_07[:3,2]
+        #z0 = np.array([[0,0,1]]) #maybe todo
+        z0 = T_01[:3,2]
+        z1 = T_02[:3,2]
+        z2 = T_03[:3,2]
+        z3 = T_04[:3,2]
+        z4 = T_05[:3,2]
+        z5 = T_06[:3,2]
+        z6 = T_07[:3,2]
 
-        o0 = np.array([[0,0,0]]) #todo
-        o1 = T_01[:3,3]
-        o2 = T_02[:3,3]
-        o3 = T_03[:3,3]
-        o4 = T_04[:3,3]
-        o5 = T_05[:3,3]
-        o6 = T_06[:3,3]
-        o7 = T_07[:3,3]
-        o8 = T_08[:3,3]
+        #o0 = np.array([[0,0,0]]) #todo
+        o0 = T_01[:3,3]
+        o1 = T_02[:3,3]
+        o2 = T_03[:3,3]
+        o3 = T_04[:3,3]
+        o4 = T_05[:3,3]
+        o5 = T_06[:3,3]
+        o6 = T_07[:3,3]
+        o7 = T_08[:3,3]
+
 
         # 7 joints + 1 box
-        J = np.zeros((6,7))
+        if to_link_no != 8:
+            J = np.zeros((3,7))
 
         if to_link_no==1:
-            o2 = o2 + np.dot(T_02[0:3,0:3],np.array([0,-0.03,0.12]))
-            J[:3,0] = np.cross(z1,o2-o1)
+            o1 = o0 + np.dot(T_01[0:3,0:3],self.com[0])
+            J[:3,0] = np.cross(z0,o1-o0)
 
         elif to_link_no==2:
-            o3 = o3 + np.dot(T_03[0:3,0:3],np.array([0.0003,0.059,0.042]))
-            J[:3,0] = np.cross(z1,o3-o1)
-            J[:3,1] = np.cross(z2,o3-o2)
+            o2 = o1 + np.dot(T_02[0:3,0:3],self.com[1])
+            J[:3,0] = np.cross(z0,o2-o0)
+            J[:3,1] = np.cross(z1,o2-o1)
 
         elif to_link_no==3:
-            o4 = o4 + np.dot(T_04[0:3,0:3],np.array([0,0.03,0.13]))
-            J[:3,0] = np.cross(z1,o4-o1)
-            J[:3,1] = np.cross(z2,o4-o2)
-            J[:3,2] = np.cross(z3,o4-o3)
+            o3 = o2 + np.dot(T_03[0:3,0:3],self.com[2])
+            J[:3,0] = np.cross(z0,o3-o0)
+            J[:3,1] = np.cross(z1,o3-o1)
+            J[:3,2] = np.cross(z2,o3-o2)
 
         elif to_link_no==4:
-            o5 = o5 + np.dot(T_05[0:3,0:3],np.array([0,0.067,0.034]))
-            J[:3,0] = np.cross(z1,o5-o1)
-            J[:3,1] = np.cross(z2,o5-o2)
-            J[:3,2] = np.cross(z3,o5-o3)
-            J[:3,3] = np.cross(z4,o5-o4)
+            o4 = o3 + np.dot(T_04[0:3,0:3],self.com[3])
+            J[:3,0] = np.cross(z0,o4-o0)
+            J[:3,1] = np.cross(z1,o4-o1)
+            J[:3,2] = np.cross(z2,o4-o2)
+            J[:3,3] = np.cross(z3,o4-o3)
 
         elif to_link_no==5:
-            o6 = o6 + np.dot(T_06[0:3,0:3],np.array([0.0001,0.021,0.076]))
-            J[:3,0] = np.cross(z1,o6-o1)
-            J[:3,1] = np.cross(z2,o6-o2)
-            J[:3,2] = np.cross(z3,o6-o3)
-            J[:3,3] = np.cross(z4,o6-o4)
-            J[:3,4] = np.cross(z5,o6-o5)
+            o5 = o4 + np.dot(T_05[0:3,0:3],self.com[4])
+            J[:3,0] = np.cross(z0,o5-o0)
+            J[:3,1] = np.cross(z1,o5-o1)
+            J[:3,2] = np.cross(z2,o5-o2)
+            J[:3,3] = np.cross(z3,o5-o3)
+            J[:3,4] = np.cross(z4,o5-o4)
 
         elif to_link_no==6:
-            o7 = o7 + np.dot(T_07[0:3,0:3],np.array([0,0.0006,0.0004]))
-            J[:3,0] = np.cross(z1,o7-o1)
-            J[:3,1] = np.cross(z2,o7-o2)
-            J[:3,2] = np.cross(z3,o7-o3)
-            J[:3,3] = np.cross(z4,o7-o4)
-            J[:3,4] = np.cross(z5,o7-o5)
-            J[:3,5] = np.cross(z6,o7-o6)
+            o6 = o5 + np.dot(T_06[0:3,0:3],self.com[5])
+            J[:3,0] = np.cross(z0,o6-o0)
+            J[:3,1] = np.cross(z1,o6-o1)
+            J[:3,2] = np.cross(z2,o6-o2)
+            J[:3,3] = np.cross(z3,o6-o3)
+            J[:3,4] = np.cross(z4,o6-o4)
+            J[:3,5] = np.cross(z5,o6-o5)
 
         elif to_link_no==7:
-            o8 = o8 + np.dot(T_08[0:3,0:3],np.array([0,0,0.02]))
-            J[:3,0] = np.cross(z1,o8-o1)
-            J[:3,1] = np.cross(z2,o8-o2)
-            J[:3,2] = np.cross(z3,o8-o3)
-            J[:3,3] = np.cross(z4,o8-o4)
-            J[:3,4] = np.cross(z5,o8-o5)
-            J[:3,5] = np.cross(z6,o8-o6)
-            J[:3,6] = np.cross(z7,o8-o7)
+            o7 = o6 + np.dot(T_07[0:3,0:3],self.com[6])
+            J[:3,0] = np.cross(z0,o7-o0)
+            J[:3,1] = np.cross(z1,o7-o1)
+            J[:3,2] = np.cross(z2,o7-o2)
+            J[:3,3] = np.cross(z3,o7-o3)
+            J[:3,4] = np.cross(z4,o7-o4)
+            J[:3,5] = np.cross(z5,o7-o5)
+            J[:3,6] = np.cross(z6,o7-o6)
 
         else:
-            o8 = o8 + np.dot(T_08[0:3,0:3],np.array([0,0,self.object_z]))
-            J[:3,0] = np.cross(z1,o8-o1)
-            J[:3,1] = np.cross(z2,o8-o2)
-            J[:3,2] = np.cross(z3,o8-o3)
-            J[:3,3] = np.cross(z4,o8-o4)
-            J[:3,4] = np.cross(z5,o8-o5)
-            J[:3,5] = np.cross(z6,o8-o6)
-            J[:3,6] = np.cross(z7,o8-o7)
+            o8 = o7 + np.dot(T_07[0:3,0:3],self.object_com)
+            J1 = np.cross(z0,o8-o0)
+            J2 = np.cross(z1,o8-o1)
+            J3 = np.cross(z2,o8-o2)
+            J4 = np.cross(z3,o8-o3)
+            J5 = np.cross(z4,o8-o4)
+            J6 = np.cross(z5,o8-o5)
+            J7 = np.cross(z6,o8-o6)
 
+            comb0 = [J1[0], J2[0], J3[0], J4[0], J5[0], J6[0], J7[0]]
+            comb1 = [J1[1], J2[1], J3[1], J4[1], J5[1], J6[1], J7[1]]
+            comb2 = [J1[2], J2[2], J3[2], J4[2], J5[2], J6[2], J7[2]]
 
-        J[3:6,0] = z1
-        J[3:6,1] = z2
-        J[3:6,2] = z3
-        J[3:6,3] = z4
-        J[3:6,4] = z5
-        J[3:6,5] = z6
-        J[3:6,6] = z7
+            J = np.matrix([comb0, comb1, comb2])
 
         # print J
         return J
