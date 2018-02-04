@@ -4,7 +4,7 @@ import sys
 import rospy
 import moveit_commander
 import tf2_ros
-#import math
+import math
 from tf.transformations import quaternion_matrix
 from sensor_msgs.msg import JointState
 import numpy as np
@@ -41,12 +41,12 @@ class q3_dynamic():
         checkPos = self.iiwa_group.get_current_joint_values()
         print checkPos
 
-        self.iiwa_group.set_joint_value_target([0.1,0.2,0.3,0.3,0.2,0.2,0])
+        self.iiwa_group.set_joint_value_target([0.1,0.2,0.3,0.3,0.2,0.2,0.5])
         self.iiwa_group.go()
         rospy.sleep(3)
         #print self.current_joint_state
 
-
+        # self.forward_kinematics_sym(2)
         self.find_mass_com_object()
 
         # link_name.append('object_iiwa_link_ee')
@@ -77,9 +77,13 @@ class q3_dynamic():
         # gravity
         self.g_z = 9.81
 
-        # mass of link 4,5,6
+        # mass and inertia tensor at centre of mass of each link
         self.m = np.array([4, 4, 3, 2.7, 1.7, 1.8, 0.3])
+        self.Icm = np.array([[0.1, 0.09, 0.02], [0.05, 0.018, 0.044], [0.08, 0.075, 0.01],
+                             [0.03, 0.01, 0.029], [0.02, 0.018, 0.005], [0.005, 0.0036, 0.0047],
+                             [0.001, 0.001, 0.001]])
 
+        # symbols for center of mass (z axis) and object mass
         self.object_z = Symbol('object_z')
         self.object_mass = Symbol('object_mass')
 
@@ -87,11 +91,118 @@ class q3_dynamic():
                              [0.0001,0.021,0.076], [0,0.0006,0.0004], [0,0,0.02]])
         self.object_com = np.array([0,0,self.object_z])
 
+
         # dh parameters => theta, d, alpha, a
-        
-        self.dh_param = np.array([[]])
+        # 3rd, 5th , 7th link requires additional translation of 0.2045, 0.1845,and 0.081 respectively.
+        self.dh_param = np.array([[      0, 0.1575,         0, 0],
+                                  [math.pi, 0.2025, math.pi/2, 0],
+                                  [math.pi,      0, math.pi/2, 0],
+                                  [      0, 0.2155, math.pi/2, 0],
+                                  [math.pi,      0, math.pi/2, 0],
+                                  [      0, 0.2155, math.pi/2, 0],
+                                  [math.pi,      0, math.pi/2, 0]])
+
+        # symbols for theta
+        self.theta1 = Symbol('theta1')
+        self.theta2 = Symbol('theta2')
+        self.theta3 = Symbol('theta3')
+        self.theta4 = Symbol('theta4')
+        self.theta5 = Symbol('theta5')
+        self.theta6 = Symbol('theta6')
+        self.theta7 = Symbol('theta7')
 
 
+    def forward_kinematics_sym(self, to_link_no):
+        additional_translation_3 = np.array([[1,0,0,0],
+                                             [0,1,0,0],
+                                             [0,0,1,0.2045],
+                                             [0,0,0,1]])
+
+        additional_translation_5 = np.array([[1,0,0,0],
+                                             [0,1,0,0],
+                                             [0,0,1,0.1845],
+                                             [0,0,0,1]])
+
+        additional_translation_7 = np.array([[1,0,0,0],
+                                             [0,1,0,0],
+                                             [0,0,1,0.081],
+                                             [0,0,0,1]])
+
+        self.theta1 += self.dh_param[0][0]
+        self.theta2 += self.dh_param[1][0]
+        self.theta3 += self.dh_param[2][0]
+        self.theta4 += self.dh_param[3][0]
+        self.theta5 += self.dh_param[4][0]
+        self.theta6 += self.dh_param[5][0]
+        self.theta7 += self.dh_param[6][0]
+
+
+        T_01 = np.array([[cos(self.theta1), -sin(self.theta1)*cos(self.dh_param[0][2]), sin(self.theta1)*sin(self.dh_param[0][2]), 0],
+                         [sin(self.theta1),  cos(self.theta1)*cos(self.dh_param[0][2]),-cos(self.theta1)*sin(self.dh_param[0][2]), 0],
+                         [               0,                   sin(self.dh_param[0][2]),                  cos(self.dh_param[0][2]), self.dh_param[0][1]],
+                         [               0,                                          0,                                         0, 1]])
+
+        T_12 = np.array([[cos(self.theta2), -sin(self.theta2)*cos(self.dh_param[1][2]), sin(self.theta2)*sin(self.dh_param[1][2]), 0],
+                         [sin(self.theta2),  cos(self.theta2)*cos(self.dh_param[1][2]),-cos(self.theta2)*sin(self.dh_param[1][2]), 0],
+                         [               0,                   sin(self.dh_param[1][2]),                  cos(self.dh_param[1][2]), self.dh_param[1][1]],
+                         [               0,                                          0,                                         0, 1]])
+
+        T_23 = np.array([[cos(self.theta3), -sin(self.theta3)*cos(self.dh_param[2][2]), sin(self.theta3)*sin(self.dh_param[2][2]), 0],
+                         [sin(self.theta3),  cos(self.theta3)*cos(self.dh_param[2][2]),-cos(self.theta3)*sin(self.dh_param[2][2]), 0],
+                         [               0,                   sin(self.dh_param[2][2]),                  cos(self.dh_param[2][2]), self.dh_param[2][1]],
+                         [               0,                                          0,                                         0, 1]])
+
+        # print 't23\n',T_23
+        T_23 = np.dot(T_23,additional_translation_3)
+        # print type(T_23)
+        # print 'new\n',T_23
+        T_34 = np.array([[cos(self.theta4), -sin(self.theta4)*cos(self.dh_param[3][2]), sin(self.theta4)*sin(self.dh_param[3][2]), 0],
+                         [sin(self.theta4),  cos(self.theta4)*cos(self.dh_param[3][2]),-cos(self.theta4)*sin(self.dh_param[3][2]), 0],
+                         [               0,                   sin(self.dh_param[3][2]),                  cos(self.dh_param[3][2]), self.dh_param[3][1]],
+                         [               0,                                          0,                                         0, 1]])
+
+        T_45 = np.array([[cos(self.theta5), -sin(self.theta5)*cos(self.dh_param[4][2]), sin(self.theta5)*sin(self.dh_param[4][2]), 0],
+                         [sin(self.theta5),  cos(self.theta5)*cos(self.dh_param[4][2]),-cos(self.theta5)*sin(self.dh_param[4][2]), 0],
+                         [               0,                   sin(self.dh_param[4][2]),                  cos(self.dh_param[4][2]), self.dh_param[4][1]],
+                         [               0,                                          0,                                         0, 1]])
+
+        T_45 = np.dot(T_45,additional_translation_5)
+
+        T_56 = np.array([[cos(self.theta6), -sin(self.theta6)*cos(self.dh_param[5][2]), sin(self.theta6)*sin(self.dh_param[5][2]), 0],
+                         [sin(self.theta6),  cos(self.theta6)*cos(self.dh_param[5][2]),-cos(self.theta6)*sin(self.dh_param[5][2]), 0],
+                         [               0,                   sin(self.dh_param[5][2]),                  cos(self.dh_param[5][2]), self.dh_param[5][1]],
+                         [               0,                                          0,                                         0, 1]])
+
+        T_67 = np.array([[cos(self.theta7), -sin(self.theta7)*cos(self.dh_param[6][2]), sin(self.theta7)*sin(self.dh_param[6][2]), 0],
+                         [sin(self.theta7),  cos(self.theta7)*cos(self.dh_param[6][2]),-cos(self.theta7)*sin(self.dh_param[6][2]), 0],
+                         [               0,                   sin(self.dh_param[6][2]),                  cos(self.dh_param[6][2]), self.dh_param[6][1]],
+                         [               0,                                          0,                                         0, 1]])
+
+        T_67 = np.dot(T_67,additional_translation_7)
+
+        if to_link_no == 1:
+            T = T_01
+        elif to_link_no == 2:
+            T = np.mat(T_01) * np.mat(T_12)
+        elif to_link_no == 3:
+            T = np.mat(T_01) * np.mat(T_12) * np.mat(T_23)
+        elif to_link_no == 4:
+            T = np.mat(T_01) * np.mat(T_12) * np.mat(T_23) * np.mat(T_34)
+        elif to_link_no == 5:
+            T = np.mat(T_01) * np.mat(T_12) * np.mat(T_23) * np.mat(T_34) * np.mat(T_45)
+        elif to_link_no == 6:
+            T = np.mat(T_01) * np.mat(T_12) * np.mat(T_23) * np.mat(T_34) * np.mat(T_45) * np.mat(T_56)
+        else:
+            T = np.mat(T_01) * np.mat(T_12) * np.mat(T_23) * np.mat(T_34) * np.mat(T_45) * np.mat(T_56) * np.mat(T_67)
+
+        T = np.asarray(T)
+
+
+        return T
+
+
+
+########## Numerical methods to find mass and CoM ############
     def find_mass_com_object(self):
         link_name = []
 
@@ -119,8 +230,14 @@ class q3_dynamic():
         sol = solve([tau_4,tau_6], [self.object_mass,self.object_z])
 
         self.object_mass = sol[0][0]
-        self.object_z = sol[0][1]
-        print self.object_mass,self.object_z
+        #self.object_z = sol[0][1]
+        print 'mass...com '
+        print self.object_mass,sol[0][1]
+
+        tau_4 = self.g_z* ( self.m[3]*J_vc4 + self.m[4]*J_vc5 +self.m[5]*J_vc6 + self.m[6]*J_vc7 + self.object_mass*J_vc8 ) - self.current_joint_state.effort[3]
+        tau_6 = self.g_z* ( self.m[5]*J6c[2,5] + self.m[6]*J7c[2,5] + self.object_mass*J8c[2,5] ) - self.current_joint_state.effort[5]
+        print 'tau4...tau6'
+        print tau_4.subs(self.object_z,sol[0][1]),tau_6.subs(self.object_z,sol[0][1])
 
 
     def get_jacobian_center(self,to_link_no,link_name):
@@ -147,7 +264,6 @@ class q3_dynamic():
         T_08 = self.pose_to_matrix(tf_08)
 
         # computer vector z and o
-        #z0 = np.array([[0,0,1]]) #maybe todo
         z0 = T_01[:3,2]
         z1 = T_02[:3,2]
         z2 = T_03[:3,2]
@@ -156,7 +272,6 @@ class q3_dynamic():
         z5 = T_06[:3,2]
         z6 = T_07[:3,2]
 
-        #o0 = np.array([[0,0,0]]) #todo
         o0 = T_01[:3,3]
         o1 = T_02[:3,3]
         o2 = T_03[:3,3]
@@ -166,35 +281,42 @@ class q3_dynamic():
         o6 = T_07[:3,3]
         o7 = T_08[:3,3]
 
+        self.R_01 = T_01[0:3,0:3]
+        self.R_02 = T_02[0:3,0:3]
+        self.R_03 = T_03[0:3,0:3]
+        self.R_04 = T_04[0:3,0:3]
+        self.R_05 = T_05[0:3,0:3]
+        self.R_06 = T_06[0:3,0:3]
+        self.R_07 = T_07[0:3,0:3]
 
         # 7 joints + 1 box
         if to_link_no != 8:
             J = np.zeros((3,7))
 
         if to_link_no==1:
-            o1 = o0 + np.dot(T_01[0:3,0:3],self.com[0])
+            o1 = o0 + np.dot(self.R_01,self.com[0])
             J[:3,0] = np.cross(z0,o1-o0)
 
         elif to_link_no==2:
-            o2 = o1 + np.dot(T_02[0:3,0:3],self.com[1])
+            o2 = o1 + np.dot(self.R_02,self.com[1])
             J[:3,0] = np.cross(z0,o2-o0)
             J[:3,1] = np.cross(z1,o2-o1)
 
         elif to_link_no==3:
-            o3 = o2 + np.dot(T_03[0:3,0:3],self.com[2])
+            o3 = o2 + np.dot(self.R_03,self.com[2])
             J[:3,0] = np.cross(z0,o3-o0)
             J[:3,1] = np.cross(z1,o3-o1)
             J[:3,2] = np.cross(z2,o3-o2)
 
         elif to_link_no==4:
-            o4 = o3 + np.dot(T_04[0:3,0:3],self.com[3])
+            o4 = o3 + np.dot(self.R_04,self.com[3])
             J[:3,0] = np.cross(z0,o4-o0)
             J[:3,1] = np.cross(z1,o4-o1)
             J[:3,2] = np.cross(z2,o4-o2)
             J[:3,3] = np.cross(z3,o4-o3)
 
         elif to_link_no==5:
-            o5 = o4 + np.dot(T_05[0:3,0:3],self.com[4])
+            o5 = o4 + np.dot(self.R_05,self.com[4])
             J[:3,0] = np.cross(z0,o5-o0)
             J[:3,1] = np.cross(z1,o5-o1)
             J[:3,2] = np.cross(z2,o5-o2)
@@ -202,7 +324,7 @@ class q3_dynamic():
             J[:3,4] = np.cross(z4,o5-o4)
 
         elif to_link_no==6:
-            o6 = o5 + np.dot(T_06[0:3,0:3],self.com[5])
+            o6 = o5 + np.dot(self.R_06,self.com[5])
             J[:3,0] = np.cross(z0,o6-o0)
             J[:3,1] = np.cross(z1,o6-o1)
             J[:3,2] = np.cross(z2,o6-o2)
@@ -211,7 +333,7 @@ class q3_dynamic():
             J[:3,5] = np.cross(z5,o6-o5)
 
         elif to_link_no==7:
-            o7 = o6 + np.dot(T_07[0:3,0:3],self.com[6])
+            o7 = o6 + np.dot(self.R_07,self.com[6])
             J[:3,0] = np.cross(z0,o7-o0)
             J[:3,1] = np.cross(z1,o7-o1)
             J[:3,2] = np.cross(z2,o7-o2)
@@ -221,7 +343,7 @@ class q3_dynamic():
             J[:3,6] = np.cross(z6,o7-o6)
 
         else:
-            o8 = o7 + np.dot(T_07[0:3,0:3],self.object_com)
+            o8 = o7 + np.dot(self.R_07,self.object_com)
             J1 = np.cross(z0,o8-o0)
             J2 = np.cross(z1,o8-o1)
             J3 = np.cross(z2,o8-o2)
