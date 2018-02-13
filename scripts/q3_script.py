@@ -46,8 +46,8 @@ class q3_dynamic():
         for i in range(0,7):
             random_joint_value.append(random.uniform(-math.pi/2, math.pi/2))
 
-        # self.iiwa_group.set_joint_value_target([1,-1,0.3,0.3,-0.5,0.2,0.5])
-        self.iiwa_group.set_joint_value_target(random_joint_value)
+        self.iiwa_group.set_joint_value_target([1,-1,0.3,0.3,-0.5,0.2,0.5])
+        # self.iiwa_group.set_joint_value_target(random_joint_value)
         # self.iiwa_group.set_joint_value_target([0,0,0,0,0,0,0])
         result = self.iiwa_group.plan()
         self.iiwa_group.execute(result, wait=False)
@@ -65,11 +65,15 @@ class q3_dynamic():
         print "finish storing joint states"
 
         self.find_mass_com_object()
+        print "finish finding object mass and com"
         ####### mass and center of mass is found! #########
 
+        # D_sym = self.compute_matrix_D_sym(0)
+        # print "finish compute D_sym"
+        # C_sym = self.compute_matrix_C_sym(D_sym)
+        # print "finish compute C_sym"
+        dP_dk = self.compute_dP_dqk_sym(1)
 
-        # self.get_jacobian_sym(2)
-        # D_sym = self.compute_matrix_D_sym(3)
 
         # When finished shut down moveit_commander.
         moveit_commander.roscpp_shutdown()
@@ -141,15 +145,43 @@ class q3_dynamic():
                             self.theta6:self.current_joint_state.position[5], \
                             self.theta7:self.current_joint_state.position[6]})
 
+    def compute_dP_dqk_sym(self,external_state):
+        dP_dqk = zeros(7,1)
+
+        if external_state == 1:
+            n = 8
+        else:
+            n = 7
+
+        Jvc_sym_list = []
+        # compute jacobian
+        for i in range(0,n):
+            Jvc_sym_list.append(self.get_jacobian_sym(i+1))
+
+
+
+        for k in range(0,7):
+            for i in range(k,n):
+                dP_dqk[k] = dP_dqk[k] + self.m[i] * self.g_z * Jvc_sym_list[i][2,k]
+                # pprint(self.m[i] * self.g_z * Jvc_sym_list[i][3,k])
+                print"check"
+
+        print "check dpdk"
+        pprint(self.substitute_sym_with_num(dP_dqk))
+
+
+        return dP_dqk
+
     def compute_matrix_C_sym(self,D_sym):
         # initialise Christoffel symbols
-        C_ijk_sym = Array(np.zeros((7,7,7)))
+        C_ijk_sym = MutableDenseNDimArray.zeros(7,7,7)
 
         # compute for every single symbol
         for i in range(0,7):
             for j in range(0,7):
                 for k in range(0,7):
                     C_ijk_sym[i,j,k] = 0.5 * (diff(D_sym[k,j],self.q[i]) + diff(D_sym[k,i],self.q[j]) - diff(D_sym[i,j],self.q[k]))
+                    print 'Cijk', i,j,k
 
 
         # store these symbols into matrix C_sym
@@ -158,6 +190,7 @@ class q3_dynamic():
             for j in range(0,7):
                 for k in range(0,7):
                     C_sym[k,j] = C_sym[k,j] + C_ijk_sym[i,j,k]*self.qdot[i]
+                    print 'Ckj matrix',i,j,k
 
         return C_sym
 
@@ -218,6 +251,8 @@ class q3_dynamic():
 
 
     def get_jacobian_sym(self, to_link_no):
+        # Jacobian v center
+
 
         # transformation matrix
         T_01 = self.forward_kinematics_sym(1)
@@ -261,24 +296,29 @@ class q3_dynamic():
         o7 = T_08[:3,3]
 
         if to_link_no==1:
+            o1 = o0 + self.sym_R_01 * Matrix(self.com[0])
             J[:3,0] = z0.cross(o1-o0)
 
         elif to_link_no==2:
+            o2 = o1 + self.sym_R_02 * Matrix(self.com[1])
             J[:3,0] = z0.cross(o2-o0)
             J[:3,1] = z1.cross(o2-o1)
 
         elif to_link_no==3:
+            o3 = o2 + self.sym_R_03 * Matrix(self.com[2])
             J[:3,0] = z0.cross(o3-o0)
             J[:3,1] = z1.cross(o3-o1)
             J[:3,2] = z2.cross(o3-o2)
 
         elif to_link_no==4:
+            o4 = o3 + self.sym_R_04 * Matrix(self.com[3])
             J[:3,0] = z0.cross(o4-o0)
             J[:3,1] = z1.cross(o4-o1)
             J[:3,2] = z2.cross(o4-o2)
             J[:3,3] = z3.cross(o4-o3)
 
         elif to_link_no==5:
+            o5 = o4 + self.sym_R_05 * Matrix(self.com[4])
             J[:3,0] = z0.cross(o5-o0)
             J[:3,1] = z1.cross(o5-o1)
             J[:3,2] = z2.cross(o5-o2)
@@ -286,6 +326,7 @@ class q3_dynamic():
             J[:3,4] = z4.cross(o5-o4)
 
         elif to_link_no==6:
+            o6 = o5 + self.sym_R_06 * Matrix(self.com[5])
             J[:3,0] = z0.cross(o6-o0)
             J[:3,1] = z1.cross(o6-o1)
             J[:3,2] = z2.cross(o6-o2)
@@ -294,6 +335,7 @@ class q3_dynamic():
             J[:3,5] = z5.cross(o6-o5)
 
         elif to_link_no==7:
+            o7 = o6 + self.sym_R_07 * Matrix(self.com[6])
             J[:3,0] = z0.cross(o7-o0)
             J[:3,1] = z1.cross(o7-o1)
             J[:3,2] = z2.cross(o7-o2)
@@ -302,7 +344,7 @@ class q3_dynamic():
             J[:3,5] = z5.cross(o7-o5)
             J[:3,6] = z6.cross(o7-o6)
         else:
-            o8 = o7 + self.sym_R_08 * Matrix([[0,0,0.1]]).T
+            o8 = o7 + self.sym_R_08 * Matrix(self.com[7])
             J[:3,0] = z0.cross(o8-o0)
             J[:3,1] = z1.cross(o8-o1)
             J[:3,2] = z2.cross(o8-o2)
@@ -349,7 +391,7 @@ class q3_dynamic():
 
         T_78 = Matrix([[1,0,0,0],
                        [0,1,0,0],
-                       [0,0,1,0.045],
+                       [0,0,1,0.045+0.1],
                        [0,0,0,1]])
 
 
@@ -390,11 +432,13 @@ class q3_dynamic():
         J7c = self.get_jacobian_center(7,link_name)
         J8c = self.get_jacobian_center(8,link_name)
 
+
         J_vc4 = J4c[2,3]
         J_vc5 = J5c[2,3]
         J_vc6 = J6c[2,3]
         J_vc7 = J7c[2,3]
         J_vc8 = J8c[2,3]
+
 
         tau_4 = self.g_z* ( self.m[3]*J_vc4 + self.m[4]*J_vc5 +self.m[5]*J_vc6 + self.m[6]*J_vc7 + self.object_mass*J_vc8 ) - self.current_joint_state.effort[3]
         tau_6 = self.g_z* ( self.m[5]*J6c[2,5] + self.m[6]*J7c[2,5] + self.object_mass*J8c[2,5] ) - self.current_joint_state.effort[5]
