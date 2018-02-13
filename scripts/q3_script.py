@@ -47,11 +47,11 @@ class q3_dynamic():
             random_joint_value.append(random.uniform(-math.pi/2, math.pi/2))
 
         # self.iiwa_group.set_joint_value_target([1,-1,0.3,0.3,-0.5,0.2,0.5])
-        # self.iiwa_group.set_joint_value_target(random_joint_value)
+        self.iiwa_group.set_joint_value_target(random_joint_value)
         # self.iiwa_group.set_joint_value_target([0,0,0,0,0,0,0])
-        # result = self.iiwa_group.plan()
-        # self.iiwa_group.execute(result, wait=False)
-        # rospy.sleep(0.1)
+        result = self.iiwa_group.plan()
+        self.iiwa_group.execute(result, wait=False)
+        rospy.sleep(0.1)
         # print "hello, start storing joint states"
         # self.record_joint_states = []
         # for i in range(0,5):
@@ -64,16 +64,13 @@ class q3_dynamic():
         # rospy.sleep(1.5)
         print "finish storing joint states"
 
-        # self.find_mass_com_object()
+        self.find_mass_com_object()
         ####### mass and center of mass is found! #########
 
-        tt_02 = self.forward_kinematics_sym(2)
-        tt3 = self.forward_kinematics_sym(1)
-        pprint(self.substitute_sym_with_num(tt_02))
-        pprint(self.substitute_sym_with_num(tt3))
 
-        self.get_jacobian_sym(2)
-        self.compute_matrix_D_sym(3)
+        # self.get_jacobian_sym(2)
+        # D_sym = self.compute_matrix_D_sym(3)
+
         # When finished shut down moveit_commander.
         moveit_commander.roscpp_shutdown()
 
@@ -96,15 +93,15 @@ class q3_dynamic():
         self.object_com = np.array([0,0,self.object_z])
 
 
-        # dh parameters => theta, d, alpha, a
+        # modified dh parameters => theta, d, alpha, a
         # 3rd, 5th , 7th link requires additional translation of 0.2045, 0.1845,and 0.081 respectively.
-        self.dh_param = np.array([[      0, 0.1575,         0, 0],
-                                  [math.pi, 0.2025, math.pi/2, 0],
-                                  [math.pi,      0, math.pi/2, 0],
-                                  [      0, 0.2155, math.pi/2, 0],
-                                  [math.pi,      0, math.pi/2, 0],
-                                  [      0, 0.2155, math.pi/2, 0],
-                                  [math.pi,      0, math.pi/2, 0]])
+        self.dh_param = np.array([[      0, 0.1575,          0, 0],
+                                  [math.pi,      0, -math.pi/2, 0],
+                                  [math.pi, 0.2045, -math.pi/2, 0],
+                                  [      0,      0,  math.pi/2, 0],
+                                  [math.pi, 0.1845, -math.pi/2, 0],
+                                  [      0,      0,  math.pi/2, 0],
+                                  [math.pi, 0.0810, -math.pi/2, 0]])
 
         # symbols for theta
         self.theta1 = Symbol('theta1')
@@ -115,20 +112,55 @@ class q3_dynamic():
         self.theta6 = Symbol('theta6')
         self.theta7 = Symbol('theta7')
 
+        # symbols for theta dot
+        self.thetadot1 = Symbol('thetadot1')
+        self.thetadot2 = Symbol('thetadot2')
+        self.thetadot3 = Symbol('thetadot3')
+        self.thetadot4 = Symbol('thetadot4')
+        self.thetadot5 = Symbol('thetadot5')
+        self.thetadot6 = Symbol('thetadot6')
+        self.thetadot7 = Symbol('thetadot7')
+
+        # store into a list
+        self.q = [self.theta1, self.theta2, self.theta3, self.theta4, self.theta5, self.theta6, self.theta7]
+        self.qdot = [self.thetadot1, self.thetadot2, self.thetadot3, self.thetadot4, self.thetadot5, self.thetadot6, self.thetadot7]
+
+
     def substitute_sym_with_num(self, matrix):
         # print self.current_joint_state.position
-        f = lambdify([self.theta1,self.theta2,self.theta3,self.theta4,self.theta5,self.theta6,self.theta7],matrix,'numpy')
-        return f(self.current_joint_state.position[0],self.current_joint_state.position[1], \
-                 self.current_joint_state.position[2],self.current_joint_state.position[3], \
-                 self.current_joint_state.position[4],self.current_joint_state.position[5], \
-                 self.current_joint_state.position[6])
-        # return matrix.subs({self.theta1:self.current_joint_state.position[0], \
-        #                     self.theta2:self.current_joint_state.position[1], \
-        #                     self.theta3:self.current_joint_state.position[2], \
-        #                     self.theta4:self.current_joint_state.position[3], \
-        #                     self.theta5:self.current_joint_state.position[4], \
-        #                     self.theta6:self.current_joint_state.position[5], \
-        #                     self.theta7:self.current_joint_state.position[6]})
+        # f = lambdify([self.theta1,self.theta2,self.theta3,self.theta4,self.theta5,self.theta6,self.theta7],matrix,'numpy')
+        # return f(self.current_joint_state.position[0],self.current_joint_state.position[1], \
+        #          self.current_joint_state.position[2],self.current_joint_state.position[3], \
+        #          self.current_joint_state.position[4],self.current_joint_state.position[5], \
+        #          self.current_joint_state.position[6])
+        return matrix.subs({self.theta1:self.current_joint_state.position[0], \
+                            self.theta2:self.current_joint_state.position[1], \
+                            self.theta3:self.current_joint_state.position[2], \
+                            self.theta4:self.current_joint_state.position[3], \
+                            self.theta5:self.current_joint_state.position[4], \
+                            self.theta6:self.current_joint_state.position[5], \
+                            self.theta7:self.current_joint_state.position[6]})
+
+    def compute_matrix_C_sym(self,D_sym):
+        # initialise Christoffel symbols
+        C_ijk_sym = Array(np.zeros((7,7,7)))
+
+        # compute for every single symbol
+        for i in range(0,7):
+            for j in range(0,7):
+                for k in range(0,7):
+                    C_ijk_sym[i,j,k] = 0.5 * (diff(D_sym[k,j],self.q[i]) + diff(D_sym[k,i],self.q[j]) - diff(D_sym[i,j],self.q[k]))
+
+
+        # store these symbols into matrix C_sym
+        C_sym = zeros(7,7)
+        for i in range(0,7):
+            for j in range(0,7):
+                for k in range(0,7):
+                    C_sym[k,j] = C_sym[k,j] + C_ijk_sym[i,j,k]*self.qdot[i]
+
+        return C_sym
+
 
     def compute_matrix_D_sym(self,external_state):
         com_rot = zeros(3,8)
@@ -181,7 +213,8 @@ class q3_dynamic():
             Jw_sym = J_sym[6*i+3:6*i+6,:] # next 3 rows
             D_sym = D_sym + self.m[i] * Jv_sym.T * Jv_sym + Jw_sym.T * I_prime_sym[3*i:3*i+3,:] * Jw_sym
 
-        pprint(self.substitute_sym_with_num(D_sym))
+        # pprint(self.substitute_sym_with_num(D_sym))
+        return D_sym
 
 
     def get_jacobian_sym(self, to_link_no):
@@ -290,93 +323,52 @@ class q3_dynamic():
         return J
 
     def forward_kinematics_sym(self, to_link_no):
+        # modified forward kinematics
+        additional_translation_1 = Matrix([[1,0,0,0],
+                                           [0,1,0,0],
+                                           [0,0,1,0.2025],
+                                           [0,0,0,1]])
+
         additional_translation_3 = Matrix([[1,0,0,0],
                                            [0,1,0,0],
-                                           [0,0,1,0.2045],
+                                           [0,0,1,0.2155],
                                            [0,0,0,1]])
 
         additional_translation_5 = Matrix([[1,0,0,0],
                                            [0,1,0,0],
-                                           [0,0,1,0.1845],
+                                           [0,0,1,0.2155],
                                            [0,0,0,1]])
 
-        additional_translation_7 = Matrix([[1,0,0,0],
-                                           [0,1,0,0],
-                                           [0,0,1,0.081],
-                                           [0,0,0,1]])
-
-
-        T_01 = Matrix([[cos(self.dh_param[0][0]+self.theta1), -sin(self.dh_param[0][0]+self.theta1)*cos(self.dh_param[0][2]), sin(self.dh_param[0][0]+self.theta1)*sin(self.dh_param[0][2]), 0],
-                       [sin(self.dh_param[0][0]+self.theta1),  cos(self.dh_param[0][0]+self.theta1)*cos(self.dh_param[0][2]),-cos(self.dh_param[0][0]+self.theta1)*sin(self.dh_param[0][2]), 0],
-                       [               0,                   sin(self.dh_param[0][2]),                  cos(self.dh_param[0][2]), self.dh_param[0][1]],
-                       [               0,                                          0,                                         0, 1]])
-
-        T_12 = Matrix([[cos(self.dh_param[1][0]+self.theta2), -sin(self.dh_param[1][0]+self.theta2)*cos(self.dh_param[1][2]), sin(self.dh_param[1][0]+self.theta2)*sin(self.dh_param[1][2]), 0],
-                       [sin(self.dh_param[1][0]+self.theta2),  cos(self.dh_param[1][0]+self.theta2)*cos(self.dh_param[1][2]),-cos(self.dh_param[1][0]+self.theta2)*sin(self.dh_param[1][2]), 0],
-                       [               0,                   sin(self.dh_param[1][2]),                  cos(self.dh_param[1][2]), self.dh_param[1][1]],
-                       [               0,                                          0,                                         0, 1]])
-
-        T_23 = Matrix([[cos(self.dh_param[2][0]+self.theta3), -sin(self.dh_param[2][0]+self.theta3)*cos(self.dh_param[2][2]), sin(self.dh_param[2][0]+self.theta3)*sin(self.dh_param[2][2]), 0],
-                       [sin(self.dh_param[2][0]+self.theta3),  cos(self.dh_param[2][0]+self.theta3)*cos(self.dh_param[2][2]),-cos(self.dh_param[2][0]+self.theta3)*sin(self.dh_param[2][2]), 0],
-                       [               0,                   sin(self.dh_param[2][2]),                  cos(self.dh_param[2][2]), self.dh_param[2][1]],
-                       [               0,                                         0,                                         0, 1]])
-
-        # print 't23\n',T_23
-        T_23 = T_23 * additional_translation_3
-        # print type(T_23)
-        # print 'new\n',T_23
-        T_34 = Matrix([[cos(self.dh_param[3][0]+self.theta4), -sin(self.dh_param[3][0]+self.theta4)*cos(self.dh_param[3][2]), sin(self.dh_param[3][0]+self.theta4)*sin(self.dh_param[3][2]), 0],
-                       [sin(self.dh_param[3][0]+self.theta4),  cos(self.dh_param[3][0]+self.theta4)*cos(self.dh_param[3][2]),-cos(self.dh_param[3][0]+self.theta4)*sin(self.dh_param[3][2]), 0],
-                       [               0,                   sin(self.dh_param[3][2]),                  cos(self.dh_param[3][2]), self.dh_param[3][1]],
-                       [               0,                                          0,                                         0, 1]])
-
-        T_45 = Matrix([[cos(self.dh_param[4][0]+self.theta5), -sin(self.dh_param[4][0]+self.theta5)*cos(self.dh_param[4][2]), sin(self.dh_param[4][0]+self.theta5)*sin(self.dh_param[4][2]), 0],
-                       [sin(self.dh_param[4][0]+self.theta5),  cos(self.dh_param[4][0]+self.theta5)*cos(self.dh_param[4][2]),-cos(self.dh_param[4][0]+self.theta5)*sin(self.dh_param[4][2]), 0],
-                       [               0,                   sin(self.dh_param[4][2]),                  cos(self.dh_param[4][2]), self.dh_param[4][1]],
-                       [               0,                                          0,                                         0, 1]])
-
-        T_45 = T_45 * additional_translation_5
-
-        T_56 = Matrix([[cos(self.dh_param[5][0]+self.theta6), -sin(self.dh_param[5][0]+self.theta6)*cos(self.dh_param[5][2]), sin(self.dh_param[5][0]+self.theta6)*sin(self.dh_param[5][2]), 0],
-                       [sin(self.dh_param[5][0]+self.theta6),  cos(self.dh_param[5][0]+self.theta6)*cos(self.dh_param[5][2]),-cos(self.dh_param[5][0]+self.theta6)*sin(self.dh_param[5][2]), 0],
-                       [               0,                   sin(self.dh_param[5][2]),                  cos(self.dh_param[5][2]), self.dh_param[5][1]],
-                       [               0,                                          0,                                         0, 1]])
-
-        T_67 = Matrix([[cos(self.dh_param[6][0]+self.theta7), -sin(self.dh_param[6][0]+self.theta7)*cos(self.dh_param[6][2]), sin(self.dh_param[6][0]+self.theta7)*sin(self.dh_param[6][2]), 0],
-                       [sin(self.dh_param[6][0]+self.theta7),  cos(self.dh_param[6][0]+self.theta7)*cos(self.dh_param[6][2]),-cos(self.dh_param[6][0]+self.theta7)*sin(self.dh_param[6][2]), 0],
-                       [               0,                   sin(self.dh_param[6][2]),                  cos(self.dh_param[6][2]), self.dh_param[6][1]],
-                       [               0,                                          0,                                         0, 1]])
-
-        T_67 = T_67 * additional_translation_7
+        T_list = []
+        for i in range(0,7):
+            T_i = Matrix([[                         cos(self.dh_param[i][0]+self.q[i]),                            -sin(self.dh_param[i][0]+self.q[i]),                        0, 0],
+                          [sin(self.dh_param[i][0]+self.q[i])*cos(self.dh_param[i][2]),  cos(self.dh_param[i][0]+self.q[i])*cos(self.dh_param[i][2]),-sin(self.dh_param[i][2]),-self.dh_param[i][1]*sin(self.dh_param[i][2])],
+                          [sin(self.dh_param[i][0]+self.q[i])*sin(self.dh_param[i][2]),  cos(self.dh_param[i][0]+self.q[i])*sin(self.dh_param[i][2]), cos(self.dh_param[i][2]), self.dh_param[i][1]*cos(self.dh_param[i][2])],
+                          [                                                          0,                                                              0,                        0, 1]])
+            T_list.append(T_i)
 
         T_78 = Matrix([[1,0,0,0],
                        [0,1,0,0],
                        [0,0,1,0.045],
                        [0,0,0,1]])
 
+
         if to_link_no == 1:
-            T = T_01
+            T = T_list[0]
         elif to_link_no == 2:
-            T = T_01 * T_12
+            T = T_list[0] * additional_translation_1 * T_list[1]
         elif to_link_no == 3:
-            T = T_01 * T_12 * T_23
-            # add3 = T[0:3,0:3] *  Matrix([0,0,0.2045])
-            # add32 = Matrix([[1,0,0],[0,1,0],[0,0,1]]).col_insert(3,add3)
-            # add32 = add32.row_insert(3,Matrix([[0,0,0,1]]))
-            #
-            # T = T * add32
+            T = T_list[0] * additional_translation_1 * T_list[1] * T_list[2]
         elif to_link_no == 4:
-            T = T_01 * T_12 * T_23 * T_34
+            T = T_list[0] * additional_translation_1 * T_list[1] * T_list[2] * additional_translation_3 * T_list[3]
         elif to_link_no == 5:
-            T = T_01 * T_12 * T_23 * T_34 * T_45
+            T = T_list[0] * additional_translation_1 * T_list[1] * T_list[2] * additional_translation_3 * T_list[3] * T_list[4]
         elif to_link_no == 6:
-            T = T_01 * T_12 * T_23 * T_34 * T_45 * T_56
+            T = T_list[0] * additional_translation_1 * T_list[1] * T_list[2] * additional_translation_3 * T_list[3] * T_list[4] * additional_translation_5 * T_list[5]
         elif to_link_no == 7:
-            T = T_01 * T_12 * T_23 * T_34 * T_45 * T_56 * T_67
+            T = T_list[0] * additional_translation_1 * T_list[1] * T_list[2] * additional_translation_3 * T_list[3] * T_list[4] * additional_translation_5 * T_list[5] * T_list[6]
         else:
-            T = T_01 * T_12 * T_23 * T_34 * T_45 * T_56 * T_67 * T_78
-
-
+            T = T_list[0] * additional_translation_1 * T_list[1] * T_list[2] * additional_translation_3 * T_list[3] * T_list[4] * additional_translation_5 * T_list[5] * T_list[6] * T_78
 
         return T
 
@@ -450,10 +442,6 @@ class q3_dynamic():
         T_06 = self.pose_to_matrix(tf_06)
         T_07 = self.pose_to_matrix(tf_07)
         T_08 = self.pose_to_matrix(tf_08)
-
-        print T_01
-        print T_02
-        # print T_06
 
         # computer vector z and o
         z0 = T_01[:3,2]
