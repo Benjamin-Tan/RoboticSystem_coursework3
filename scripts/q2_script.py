@@ -37,7 +37,7 @@ class pick_and_place:
 
         rospy.sleep(1)
 
-        N = 15 # amount of tracking to average
+        N = 10 # amount of tracking to average
 
         combine_obj_pos = np.empty((N,9))
         combine_euler = np.empty((N,9))
@@ -114,8 +114,8 @@ class pick_and_place:
             while True:
                 try:
                     object_pose = self.tf_buffer.lookup_transform('world', objects[i], rospy.Time.now())
+                    rospy.sleep(0.5)
                 except (tf2_ros.ExtrapolationException,tf2_ros.LookupException,tf2_ros.ConnectivityException):
-                    rospy.sleep(0.2)
                     continue
                 break
             print('Found object {} [{}] at: \n{}'.format(i,objects[i],object_pose.transform))

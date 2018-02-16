@@ -144,7 +144,7 @@ class q3_dynamic():
 ######## THE CODE BELOW PERFORMS EXACTLY THE SAME AS ABOVE. ##############################
 
         # find external wrench #
-        print "========================== finding External Wrench ========================"
+        print "========================== finding External torque at joint space ========================"
         D_0 = self.closed_form_D_0(q_total,self.qdot_total,self.m[7])
         D_1 = self.closed_form_D_1(q_total,self.qdot_total,self.m[7])
 
@@ -160,13 +160,14 @@ class q3_dynamic():
 
         tau_external = tau_total - tau_0
 
-        rospy.loginfo('External wrench at joint 1 is [0,0,0,0,0,%f]',tau_external[0])
-        rospy.loginfo('External wrench at joint 2 is [0,0,0,0,0,%f]',tau_external[1])
-        rospy.loginfo('External wrench at joint 3 is [0,0,0,0,0,%f]',tau_external[2])
-        rospy.loginfo('External wrench at joint 4 is [0,0,0,0,0,%f]',tau_external[3])
-        rospy.loginfo('External wrench at joint 5 is [0,0,0,0,0,%f]',tau_external[4])
-        rospy.loginfo('External wrench at joint 6 is [0,0,0,0,0,%f]',tau_external[5])
-        rospy.loginfo('External wrench at joint 7 is [0,0,0,0,0,%f]\n',tau_external[6])
+        rospy.loginfo('External torque at joint 1 is [%f]',tau_external[0])
+        rospy.loginfo('External torque at joint 2 is [%f]',tau_external[1])
+        rospy.loginfo('External torque at joint 3 is [%f]',tau_external[2])
+        rospy.loginfo('External torque at joint 4 is [%f]',tau_external[3])
+        rospy.loginfo('External torque at joint 5 is [%f]',tau_external[4])
+        rospy.loginfo('External torque at joint 6 is [%f]',tau_external[5])
+        rospy.loginfo('External torque at joint 7 is [%f]\n',tau_external[6])
+
 
         # find Cartesian Wrench #
         print "========================== finding Cartesian Wrench ========================"
@@ -178,7 +179,7 @@ class q3_dynamic():
         J5 = self.substitute_sym_with_num(self.get_jacobian_sym(5),chosen_joint_state)
         J6 = self.substitute_sym_with_num(self.get_jacobian_sym(6),chosen_joint_state)
         J7 = self.substitute_sym_with_num(self.get_jacobian_sym(7),chosen_joint_state)
-        J8 = self.substitute_sym_with_num(self.get_jacobian_sym(7),chosen_joint_state)
+        J8 = self.substitute_sym_with_num(self.get_jacobian_sym(8),chosen_joint_state)
 
         Jdot1 = self.closed_form_Jdot_1(q_total,self.qdot_total,self.m[7])
         Jdot2 = self.closed_form_Jdot_2(q_total,self.qdot_total,self.m[7])
@@ -248,6 +249,25 @@ class q3_dynamic():
         rospy.loginfo("Cartesian wrench at link 7 is [%.5f,%.5f,%.5f,%.5f,%.5f,%.5f]",F7[0],F7[1],F7[2],N7[0],N7[1],N7[2])
         rospy.loginfo("Cartesian wrench at link 8 is [%.5f,%.5f,%.5f,%.5f,%.5f,%.5f]",F8[0],F8[1],F8[2],N8[0],N8[1],N8[2])
 
+
+        print " ======================= compute External Wrench ==============================="
+        F_ext = self.m[7]*(Matrix([[0,0,self.g_z]]).T + a8)
+        # convert torque to cartesian moment using rotation matrix
+        N_ext1 = self.substitute_sym_with_num(self.sym_R_01,chosen_joint_state)*Matrix([[0,0,tau_external[0]]]).T
+        N_ext2 = self.substitute_sym_with_num(self.sym_R_02,chosen_joint_state)*Matrix([[0,0,tau_external[1]]]).T
+        N_ext3 = self.substitute_sym_with_num(self.sym_R_03,chosen_joint_state)*Matrix([[0,0,tau_external[2]]]).T
+        N_ext4 = self.substitute_sym_with_num(self.sym_R_04,chosen_joint_state)*Matrix([[0,0,tau_external[3]]]).T
+        N_ext5 = self.substitute_sym_with_num(self.sym_R_05,chosen_joint_state)*Matrix([[0,0,tau_external[4]]]).T
+        N_ext6 = self.substitute_sym_with_num(self.sym_R_06,chosen_joint_state)*Matrix([[0,0,tau_external[5]]]).T
+        N_ext7 = self.substitute_sym_with_num(self.sym_R_07,chosen_joint_state)*Matrix([[0,0,tau_external[6]]]).T
+
+        rospy.loginfo("External wrench at joint 1 is [%.5f,%.5f,%.5f,%.5f,%.5f,%.5f]",F_ext[0],F_ext[1],F_ext[2],N_ext1[0],N_ext1[1],N_ext1[2])
+        rospy.loginfo("External wrench at joint 2 is [%.5f,%.5f,%.5f,%.5f,%.5f,%.5f]",F_ext[0],F_ext[1],F_ext[2],N_ext2[0],N_ext2[1],N_ext2[2])
+        rospy.loginfo("External wrench at joint 3 is [%.5f,%.5f,%.5f,%.5f,%.5f,%.5f]",F_ext[0],F_ext[1],F_ext[2],N_ext3[0],N_ext3[1],N_ext3[2])
+        rospy.loginfo("External wrench at joint 4 is [%.5f,%.5f,%.5f,%.5f,%.5f,%.5f]",F_ext[0],F_ext[1],F_ext[2],N_ext4[0],N_ext4[1],N_ext4[2])
+        rospy.loginfo("External wrench at joint 5 is [%.5f,%.5f,%.5f,%.5f,%.5f,%.5f]",F_ext[0],F_ext[1],F_ext[2],N_ext5[0],N_ext5[1],N_ext5[2])
+        rospy.loginfo("External wrench at joint 6 is [%.5f,%.5f,%.5f,%.5f,%.5f,%.5f]",F_ext[0],F_ext[1],F_ext[2],N_ext6[0],N_ext6[1],N_ext6[2])
+        rospy.loginfo("External wrench at joint 7 is [%.5f,%.5f,%.5f,%.5f,%.5f,%.5f]",F_ext[0],F_ext[1],F_ext[2],N_ext7[0],N_ext7[1],N_ext7[2])
         # When finished shut down moveit_commander.
         moveit_commander.roscpp_shutdown()
 
@@ -1133,8 +1153,8 @@ class q3_dynamic():
         while True:
             try:
                 trans = self.tf_buffer.lookup_transform(current_frame,target_frame, rospy.Time())
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 rospy.sleep(0.2)
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 continue
             break
         return trans

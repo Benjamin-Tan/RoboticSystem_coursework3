@@ -1,22 +1,17 @@
-# COMPGX01 - Robotic Systems Engineering Coursework 1
+# COMPGX01 - Robotic Systems Engineering Coursework 3
+## Prerequisites
+* Please have the compgx01_cw3 and compgx01_cw3_deps installed alongside with this directory.
+Those 2 repositories are crucial for this codes to function properly.
 
-## Question 7
-A ROS service server has been written to convert different representations. The instructions are as followed:
-  * Launch this server using `rosrun coursework_1 coursework_1_node`
-    * The server will be up, and ready for any ROS service client to request for a response.
+## Question 1
+* First, `roslaunch cw3_launch q1_grasping.launch`
+* Second, wait for the robot to be booted up completely, then run `roslaunch coursework3 q1.launch`
 
-Alternatively, three seperate nodes has been written for each part of question 7.
-  * Launch part(a) using `roslaunch coursework_1 quat_to_Euler.launch`
-  * Launch part(b) using `roslaunch coursework_1 quat_to_Axis.launch`
-  * Launch part(c) using `roslaunch coursework_1 rotation_to_Quat.launch`
-    * You can pass in the arguments of each launch file with the respective parameter values.
+## Question 2
+* First, `roslaunch cw3_launch q2_vision_grasping.launch`
+* Second, wait for the robot to be booted up completely, then run `roslaunch coursework3 q2.launch`
+** note that this will take a longer time as compared to question 1
 
-## Question 8(d)
-A ROS node has been created to retrieve DH parameters from the published topics by youbot. The respective TF are
-broadcasted after obtaining the DH parameters.
-  * Launch using `roslaunch coursework_1 forwardKinematic.launch`
-    * Remember to launch the youbot simulator by `roslaunch youbot_simulator youbot_sim.launch`
-  * The DH parameters are obtained by subscribing to `/gazebo/link_staes` and `/joint_states` topics.
-    * Standard DH convention is used, only rotation and translation around z-axis first before x-axis.
-    * the frames orientation are a little different from the original youbot due to the DH convention, since ROS
-	  is able to rotate and translate around 3 axis.
+## Question 3
+* First, `roslaunch cw3_launch q3_dynamics.launch`
+* Second, wait for the robot to be booted up completely, then run `roslaunch coursework3 q3.launch`
