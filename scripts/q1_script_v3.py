@@ -11,7 +11,7 @@ from gazebo_msgs.msg import ContactsState, ContactState
 
 class pick_and_place:
     def __init__(self):
-        rospy.sleep(10) # wait for other files to be launched successfully
+        # rospy.sleep(10) # wait for other files to be launched successfully
 
         moveit_commander.roscpp_initialize(sys.argv)
         rospy.init_node('cw3_q1')
@@ -58,6 +58,9 @@ class pick_and_place:
             # close the hand (grasping)
             self.hand_close()
 
+            # hold the grasping position for 10 seconds
+            rospy.sleep(10)
+
             # open the hand (releasing)
             self.hand_open()
 
@@ -78,8 +81,8 @@ class pick_and_place:
             while True:
                 try:
                     object_pose = self.tf_buffer.lookup_transform('world', objects[i], rospy.Time.now())
-                    rospy.sleep(1)
                 except (tf2_ros.ExtrapolationException,tf2_ros.LookupException,tf2_ros.ConnectivityException):
+                    rospy.sleep(0.2)
                     continue
                 break
             print('Found object {} [{}] at: \n{}'.format(i,objects[i],object_pose.transform))
@@ -100,7 +103,7 @@ class pick_and_place:
         rospy.loginfo("Hand opening")
         result = self.hand_group.plan(self.open_joint_values)
         print self.hand_group.execute(result, wait=True)
-        while self.hand_group.execute(result, wait=True) != True and count<3:
+        while self.hand_group.execute(result, wait=True) != True and count<5:
             count += 1
             rospy.logwarn("Hand opening failed and retry attempt {}".format(count))
             result = self.hand_group.plan(self.open_joint_values)

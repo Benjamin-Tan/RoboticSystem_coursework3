@@ -1,19 +1,9 @@
 <?xml version="1.0"?>
 <launch>
-	<!-- Arguments available to run this -->
-  <arg name="gui" default="true"/>
-  <arg name="gz_gui" default="true"/>
-  <arg name="scene" default="1"/>
-  <arg name="initial_z" default="0.0" />
-  
-  <arg name="mass" value="3" if="$(eval arg('scene') == 1)"/>
-  <arg name="mass" value="1.5" if="$(eval arg('scene') == 2)"/>
-    
-  <include file="$(find cw3_launch)/launch/object_iiwa.launch">
-    <arg name="gui" value="$(arg gui)"/>
-    <arg name="gz_gui" value="$(arg gz_gui)"/>
-    <arg name="initial_z" value="$(arg initial_z)"/>
-    <arg name="mass" value="$(arg mass)"/>
-  </include>
-  
+
+   <node pkg="coursework3" type="q3_script.py" name="cw3_q3" output="screen"/>
+
 </launch>
+
+
+
